@@ -15,6 +15,7 @@ import {
   formatRate,
   formatUSD,
   monthTargetSeconds,
+  monthToCSV,
   monthWorkingDays,
   offerRate,
   paceCheck,
@@ -433,5 +434,19 @@ describe('summary message and backups', () => {
   it('rejects files that are not backups', () => {
     expect(() => parseBackup('nope')).toThrow('not valid JSON')
     expect(() => parseBackup('{"version":2}')).toThrow('not an Earnings Tracker backup')
+  })
+
+  it('CSV export neutralises formula-like notes but keeps negative numbers', () => {
+    const s = summarizeMonth('2026-11', {
+      ...november(),
+      periodTotals: [],
+      entries: [
+        { ...entry('2026-11-02', 8 * H), note: '=HYPERLINK("http://x","y")' },
+        { ...entry('2026-11-03', -1 * H, 'adjustment'), note: 'late start' },
+      ],
+    })
+    const csv = monthToCSV(s)
+    expect(csv).toContain(`"'=HYPERLINK(""http://x"",""y"")"`)
+    expect(csv).toContain('adjustment,−1:00:00,-1.0000,4.3800,-4.38,yes,late start')
   })
 })

@@ -8,6 +8,9 @@ const csvCell = (v: string | number) => {
   return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
 }
 
+/** Free text a spreadsheet would run as a formula (=, +, -, @, tab, CR) gets a leading apostrophe. */
+const csvText = (s: string) => (/^[=+\-@\t\r]/.test(s) ? `'${s}` : s)
+
 /** One month as CSV: the tracker card (if any) then every entry. */
 export function monthToCSV(summary: MonthSummary): string {
   const rows: Array<Array<string | number>> = [
@@ -37,7 +40,7 @@ export function monthToCSV(summary: MonthSummary): string {
       (v.rate4 / 10_000).toFixed(4),
       (v.cents / 100).toFixed(2),
       v.covered ? 'no (in tracker total)' : 'yes',
-      v.entry.note ?? '',
+      csvText(v.entry.note ?? ''),
     ])
   }
   return rows.map((r) => r.map(csvCell).join(',')).join('\n') + '\n'
