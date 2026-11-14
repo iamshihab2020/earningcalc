@@ -13,8 +13,14 @@ npm run build      # production build + service worker (works offline, installab
 
 ## Deploy (GitHub Pages)
 
-`.github/workflows/deploy.yml` runs the unit tests, builds with `BASE_PATH=/<repo>/`, and publishes `dist/` on every
-push to `main`. One-time setup: repo **Settings → Pages → Source: GitHub Actions**.
+Live at https://iamshihab2020.github.io/earningcalc/. To publish the current commit:
+
+```bash
+npm run deploy     # tests, builds with BASE_PATH=/<repo>/, force-pushes dist/ to the gh-pages branch
+```
+
+Pages is set to **Deploy from a branch: gh-pages /**. `.github/workflows/deploy.yml` is the Actions alternative; it
+is manual-only while the account's Actions are blocked by a billing lock.
 
 Data never leaves the browser: it lives in `localStorage` under `earnings-tracker:v1`, per browser and per device.
 Use **Settings → Data → Export backup / Import backup** to move it between devices. All Pages sites of one account share the origin
