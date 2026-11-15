@@ -37,6 +37,12 @@ answers those from the numbers you already have, and gives you a summary you can
 - Paste your tracker's total (for example `118:40:48` and `$519.82`) and get your real hourly rate, worked out exactly
 - This month's earnings in USD and your local currency, with progress against the month's target hours
 - Ahead/behind pace, based on your working days and daily target
+- Pay periods that match yours: calendar months, or any start day (for example the 26th to the 25th)
+
+**History**
+- Every pay period you've logged, newest first: hours, earned, paid, and whether it was paid in full
+- All-time totals: earned, paid, still owed, hours
+- Add earlier periods from your tracker's totals, and export the whole history as CSV
 
 **Time**
 - Log a single day, backfill a date range (skips weekends and days off), or enter a tracker total for the month
@@ -75,6 +81,11 @@ answers those from the numbers you already have, and gives you a summary you can
   </tr>
 </table>
 
+<p align="center">
+  <img src="docs/screenshots/history.png" width="49%" alt="History: every period with earned, paid and all-time totals" />
+  <img src="docs/screenshots/what-if.png" width="49%" alt="What-if: month-end situations A to E" />
+</p>
+
 ## How to use
 
 Open **https://iamshihab2020.github.io/earningcalc/**. Want to look around first? Tap **Load sample data** on the
@@ -82,19 +93,22 @@ welcome screen, then remove it later with **Settings → Data → Delete all dat
 
 1. **Set your rate.** Tap **Enter tracker total** and paste the time and amount from your tracker's schedule card. The
    app suggests the rate that reproduces that total. Or tap **Set hourly rate** and type it in.
-2. **Check your schedule.** In **Rate & schedule**, set your working days and daily target (default Mon–Fri, 8 h), and
-   mark holidays and days off.
+2. **Check your schedule.** In **Rate & schedule**, set your working days, daily target (default Mon–Fri, 8 h) and
+   the day your pay period starts (default the 1st, i.e. calendar months), and mark holidays and days off.
 3. **Log time.** Tap **Add time**:
    - **Single**: one day's hours, with a type (*Tracked*, *Backfill* or *Adjustment*) and a note
    - **Backfill**: hours your manager added for a date range; days off are skipped
    - **Tracker total**: the month's total from your tracker; a newer reading replaces the old one
 4. **Record payments.** In **Payments**, tap **Record payment** and choose which month it pays for. The month shows
    *Paid in full*, *Short by $…* (with the gap in hours) or *No payment recorded*.
-5. **Plan the month.** The dashboard shows where you'll finish at your current hours per day. **What-if** lets you try
+5. **See your history.** **History** lists every period with what you earned and were paid, plus all-time totals.
+   To log what you earned before you started using the app, tap **Add earlier period** and enter that period's
+   tracker totals.
+6. **Plan the month.** The dashboard shows where you'll finish at your current hours per day. **What-if** lets you try
    other situations, and work out what a monthly offer is worth per hour.
-6. **Share.** **Share & export** has a summary message to copy into Slack, a CSV of the month, and a printable
+7. **Share.** **Share & export** has a summary message to copy into Slack, a CSV of the month, and a printable
    statement.
-7. **Back up.** **Settings → Data → Export backup** now and then. It's the only copy outside your browser.
+8. **Back up.** **Settings → Data → Export backup** now and then. It's the only copy outside your browser.
 
 **Install it as an app:** on Android or desktop Chrome/Edge, use **Install app** in the browser menu (or the install
 icon in the address bar). On iPhone, open it in Safari, tap **Share → Add to Home Screen**.
@@ -127,6 +141,23 @@ but export a backup regularly to be safe.
 
 Yes. After the first visit the whole app is cached, so it opens and works without a connection. Only **Fetch latest
 exchange rate** needs the internet.
+</details>
+
+<details>
+<summary><b>My pay period runs from the 26th to the 25th, not by calendar month.</b></summary>
+
+Go to **Rate & schedule → Work schedule → Pay period starts on** and pick the 26th. Each period then runs from the 26th
+to the 25th, and is named after the month it ends in: "November 2026" is Oct 26 – Nov 25. The target hours, days left,
+projections, payments and history all follow it. Set this before entering your totals: a tracker total counts in the
+period of its "as of" date, and if two end up in one period, the app shows which one isn't counted.
+</details>
+
+<details>
+<summary><b>How do I log what I earned before I started using the app?</b></summary>
+
+In **History**, tap **Add earlier period**. It opens the tracker-total form for the period before your oldest one: enter
+that period's total time and amount from your tracker. Repeat for each earlier period. Each one shows up in History and
+in the all-time totals.
 </details>
 
 <details>
@@ -202,7 +233,7 @@ src/
   engine/       Pure calculation module, no React. Money in integer cents, rates in 1/10,000 USD,
                 dates as YYYY-MM-DD strings. The UI only displays what this returns.
   store/        Zustand store persisted to localStorage, with undo for every destructive action
-  features/     Screens: dashboard, time, payments, rates, what-if, share, settings
+  features/     Screens: dashboard, time, payments, history, rates, what-if, share, settings
   components/   Shared UI (buttons, cards, sheets, month selector)
 e2e/            Playwright flows
 scripts/        deploy-pages.mjs, screenshots.mjs
@@ -234,6 +265,7 @@ Where the product spec was silent or contradicted itself:
 | Rate change modes | "From start of month" adds a rate on the 1st; "whole month" also removes other changes inside that month, keeping later months' rates. |
 | Dates before the first rate | The earliest rate also covers them. |
 | BDT payments | Store the exchange rate used, so later rate changes don't alter past reconciliations. |
+| Pay periods | Named after the month they end in, so with start day 1 every month key keeps its meaning. A tracker total belongs to the period of its "as of" date. Start days run 1–28 so every month has the day. |
 | Today in projections | Remaining days start tomorrow ("Count today as worked" on). The spec's worked example 2 assumes it off. |
 
 ### Not built yet

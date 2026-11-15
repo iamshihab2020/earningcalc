@@ -72,6 +72,12 @@ export interface Schedule {
   workingDays: number[]
   dailyTargetHours: number
   daysOff: DayOff[]
+  /**
+   * Day of the month a pay period starts (1–28). 1 = calendar months. With 26,
+   * the period keyed "2026-11" runs Oct 26 – Nov 25. Every `YearMonth` that
+   * names "a month of work" is such a period key.
+   */
+  periodStartDay?: number
 }
 
 export interface Settings {
@@ -88,6 +94,8 @@ export interface Settings {
   theme: 'light' | 'dark' | 'system'
   /** When true, remaining days start tomorrow (PRD default). */
   countTodayAsWorked: boolean
+  /** See `Schedule.periodStartDay`. */
+  periodStartDay: number
 }
 
 export interface AppData {

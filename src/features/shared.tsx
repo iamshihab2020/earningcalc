@@ -1,6 +1,18 @@
-import type { ReactNode } from 'react'
-import { formatHMS, formatHours, formatHoursShort, formatRange, formatUSD, type CardValuation, type PaymentStatus, type Reconciliation } from '@/engine'
+import { useMemo, type ReactNode } from 'react'
+import { useShallow } from 'zustand/react/shallow'
+import {
+  formatHMS,
+  formatHours,
+  formatHoursShort,
+  formatRange,
+  formatUSD,
+  uncountedCards,
+  type CardValuation,
+  type PaymentStatus,
+  type Reconciliation,
+} from '@/engine'
 import { useData } from '@/store/data'
+import { undoToast } from '@/lib/toast'
 import { useFormat } from '@/store/hooks'
 import { Button, Chip, Notice, cn } from '@/components/ui'
 import { AnimatedNumber } from '@/components/AnimatedNumber'
@@ -113,5 +125,42 @@ export function ScenarioCard({
       </p>
       {children}
     </div>
+  )
+}
+
+/**
+ * Warns about tracker totals that no longer count: after the pay period start
+ * day changes, two totals can end in the same period and only the newer counts.
+ */
+export function UncountedCardsNotice() {
+  const { periodTotals, startDay, deleteCard } = useData(
+    useShallow((s) => ({ periodTotals: s.periodTotals, startDay: s.settings.periodStartDay, deleteCard: s.deleteCard })),
+  )
+  const hidden = useMemo(() => uncountedCards(periodTotals, startDay), [periodTotals, startDay])
+  if (hidden.length === 0) return null
+  return (
+    <Notice tone="warning">
+      <p>
+        {hidden.length === 1 ? 'This tracker total isn’t counted' : `These ${hidden.length} tracker totals aren’t counted`}: each pay period counts
+        one tracker total (the newest), and {hidden.length === 1 ? 'it shares' : 'they share'} a period with a newer one. Re-enter it for the new
+        periods, or change the start day back.
+      </p>
+      <ul className="mt-2 flex flex-col gap-1">
+        {hidden.map((c) => (
+          <li key={c.id} className="flex flex-wrap items-center gap-x-3">
+            <span className="num">
+              {formatRange(c.startDate, c.endDate)}: {formatHMS(c.seconds)}, {formatUSD(c.trackerEarnedCents)}
+            </span>
+            <button
+              type="button"
+              className="min-h-9 font-semibold underline underline-offset-2"
+              onClick={() => undoToast('Tracker total deleted', deleteCard(c.id))}
+            >
+              Delete
+            </button>
+          </li>
+        ))}
+      </ul>
+    </Notice>
   )
 }

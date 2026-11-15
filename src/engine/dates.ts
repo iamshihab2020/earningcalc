@@ -56,6 +56,34 @@ export function eachDay(start: ISODate, end: ISODate): ISODate[] {
 
 export const monthDays = (month: YearMonth) => eachDay(firstOfMonth(month), lastOfMonth(month))
 
+/*
+ * Pay periods. A period is keyed by the month it ENDS in, so with start day 26
+ * the key "2026-11" is Oct 26 – Nov 25. Start day 1 is the calendar month, so
+ * every existing month key keeps its meaning.
+ */
+
+/** Start days run 1–28 so every month has the day. */
+export const clampStartDay = (day?: number): number => (!day || day < 1 ? 1 : Math.min(28, Math.floor(day)))
+
+export function periodStart(key: YearMonth, startDay = 1): ISODate {
+  const d = clampStartDay(startDay)
+  return d === 1 ? firstOfMonth(key) : `${addMonths(key, -1)}-${pad(d)}`
+}
+
+export function periodEnd(key: YearMonth, startDay = 1): ISODate {
+  const d = clampStartDay(startDay)
+  return d === 1 ? lastOfMonth(key) : `${key}-${pad(d - 1)}`
+}
+
+/** The key of the pay period that contains `date`. */
+export function periodOf(date: ISODate, startDay = 1): YearMonth {
+  const d = clampStartDay(startDay)
+  const month = monthOf(date)
+  return d > 1 && Number(date.slice(8, 10)) >= d ? addMonths(month, 1) : month
+}
+
+export const periodDays = (key: YearMonth, startDay = 1) => eachDay(periodStart(key, startDay), periodEnd(key, startDay))
+
 /** Monday of the week containing `date`. */
 export function startOfWeek(date: ISODate): ISODate {
   const wd = weekday(date)
@@ -102,4 +130,22 @@ export function formatRange(start: ISODate, end: ISODate): string {
   if (start === end) return formatShortDate(start)
   if (monthOf(start) === monthOf(end)) return `${formatShortDate(start)} – ${Number(end.slice(8))}`
   return `${formatShortDate(start)} – ${formatShortDate(end)}`
+}
+
+/** 1 → "1st", 22 → "22nd", 25 → "25th" */
+export function ordinal(n: number): string {
+  const tens = n % 100
+  const suffix = tens >= 11 && tens <= 13 ? 'th' : n % 10 === 1 ? 'st' : n % 10 === 2 ? 'nd' : n % 10 === 3 ? 'rd' : 'th'
+  return `${n}${suffix}`
+}
+
+/** null for calendar months, else "Oct 26 – Nov 25". */
+export function formatPeriodRange(key: YearMonth, startDay = 1): string | null {
+  return clampStartDay(startDay) === 1 ? null : formatRange(periodStart(key, startDay), periodEnd(key, startDay))
+}
+
+/** "November 2026", or "November 2026 (Oct 26 – Nov 25)" for a custom pay period. */
+export function formatPeriod(key: YearMonth, startDay = 1): string {
+  const range = formatPeriodRange(key, startDay)
+  return range ? `${formatMonth(key)} (${range})` : formatMonth(key)
 }

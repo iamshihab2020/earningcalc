@@ -1,4 +1,4 @@
-import { addDays, addMonths, firstOfMonth, lastOfMonth } from './dates'
+import { addDays, addMonths, periodEnd, periodStart } from './dates'
 import { divRound, earnCents, fromRate4, toRate4 } from './money'
 import type { ISODate, RatePeriod, YearMonth } from './types'
 
@@ -66,13 +66,15 @@ export interface RateChange {
   mode: RateChangeMode
   /** Used by `from-date`. */
   date: ISODate
-  /** Used by `month-start` and `whole-month`. */
+  /** Used by `month-start` and `whole-month`: a pay-period key. */
   month: YearMonth
+  /** Pay period start day (1 = calendar months). */
+  startDay?: number
   note?: string
 }
 
 export function effectiveDateOf(change: RateChange): ISODate {
-  return change.mode === 'from-date' ? change.date : firstOfMonth(change.month)
+  return change.mode === 'from-date' ? change.date : periodStart(change.month, change.startDay)
 }
 
 /**
@@ -90,9 +92,9 @@ export function applyRateChange(periods: RatePeriod[], change: RateChange): Rate
   let next = sortRates(periods)
 
   if (change.mode === 'whole-month') {
-    const monthStart = firstOfMonth(change.month)
-    const monthEnd = lastOfMonth(change.month)
-    const nextMonthStart = firstOfMonth(addMonths(change.month, 1))
+    const monthStart = periodStart(change.month, change.startDay)
+    const monthEnd = periodEnd(change.month, change.startDay)
+    const nextMonthStart = periodStart(addMonths(change.month, 1), change.startDay)
     const rateAfter = rateOn(nextMonthStart, next)
     const removed = next.filter((p) => p.effectiveFrom > monthStart && p.effectiveFrom <= monthEnd)
     if (removed.length > 0) {

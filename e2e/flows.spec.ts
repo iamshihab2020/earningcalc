@@ -159,10 +159,53 @@ test('deleting has undo, and data survives a reload (AC8)', async ({ page }) => 
 
 test('AC9: no horizontal scrolling on any screen', async ({ page }) => {
   await loadSample(page)
-  for (const route of ['/', '/time', '/payments', '/rates', '/what-if', '/share', '/settings', '/statement']) {
+  for (const route of ['/', '/time', '/payments', '/history', '/rates', '/what-if', '/share', '/settings', '/statement']) {
     await goto(page, route)
     await page.waitForTimeout(150)
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
     expect(overflow, `overflow on ${route}`).toBeLessThanOrEqual(0)
   }
+})
+
+test('pay period 26th–25th, and the earnings history adds every period up', async ({ page }) => {
+  await page.getByRole('button', { name: 'Set hourly rate' }).click()
+  await page.getByLabel('Hourly rate (USD)').fill('4.38')
+  await page.getByRole('button', { name: 'Save rate' }).click()
+
+  await goto(page, '/rates')
+  await page.getByLabel('Pay period starts on').selectOption('26')
+  await expect(page.getByText('This one: Oct 26 – Nov 25.')).toBeVisible()
+
+  // Oct 26 – Nov 25 has 23 working days.
+  await goto(page, '/')
+  await expect(page.getByRole('button', { name: /November 2026 \(Oct 26 – Nov 25\)/ })).toBeVisible()
+  await expect(hero(page)).toContainText('/ 184 h')
+
+  // A tracker total for this period; its first day defaults to the period start.
+  await addTimeButton(page).click()
+  await page.getByRole('tab', { name: 'Tracker total' }).click()
+  const sheet = page.getByRole('dialog')
+  await expect(sheet.getByLabel('First day tracked')).toHaveValue('2026-10-26')
+  await sheet.getByLabel('Total time').fill('62:41:12')
+  await sheet.getByLabel('Total earned').fill('274.57')
+  await sheet.getByRole('button', { name: 'Save tracker total' }).click()
+  await expect(hero(page)).toContainText('$274.57')
+
+  // Oct 23 belongs to the previous period (Sep 26 – Oct 25).
+  await addTimeButton(page).click()
+  await sheet.getByLabel('Date', { exact: true }).fill('2026-10-23')
+  await sheet.getByRole('radio', { name: 'Backfill' }).click()
+  await sheet.getByRole('button', { name: 'Add time' }).click()
+  await expect(hero(page)).toContainText('$274.57')
+
+  await goto(page, '/history')
+  await page.reload() // clears the three undo toasts, which cover the rows; data persists
+  const main = page.locator('main')
+  await expect(main).toContainText('Oct 26 – Nov 25')
+  await expect(main).toContainText('Sep 26 – Oct 25')
+  await expect(main).toContainText('$35.04')
+  await expect(main).toContainText('$309.61') // all time
+
+  await page.getByRole('button', { name: /October 2026 \(Sep 26 – Oct 25\)/ }).click()
+  await expect(hero(page)).toContainText('$35.04')
 })

@@ -1,7 +1,7 @@
 import { Route, Router, Switch, Link, useLocation } from 'wouter'
 import { useHashLocation } from 'wouter/use-hash-location'
 import { Toaster } from 'sonner'
-import { Calculator, Clock, Gauge, House, Plus, Settings as SettingsIcon, Share2, Wallet } from 'lucide-react'
+import { Calculator, Clock, Gauge, History as HistoryIcon, House, Plus, Settings as SettingsIcon, Share2, Wallet } from 'lucide-react'
 import { useEffect } from 'react'
 import { useData } from '@/store/data'
 import { useThemeClass } from '@/store/hooks'
@@ -18,11 +18,13 @@ import { WhatIf } from '@/features/whatif/WhatIf'
 import { Share } from '@/features/share/Share'
 import { SettingsPage } from '@/features/settings/Settings'
 import { Statement } from '@/features/share/Statement'
+import { History } from '@/features/history/History'
 
 const primaryNav = [
   { href: '/', label: 'Home', icon: House },
   { href: '/time', label: 'Time', icon: Clock },
   { href: '/payments', label: 'Payments', icon: Wallet },
+  { href: '/history', label: 'History', icon: HistoryIcon },
   { href: '/settings', label: 'Settings', icon: SettingsIcon },
 ]
 const secondaryNav = [
@@ -101,7 +103,7 @@ function Shell() {
             <span className="text-lg font-semibold tracking-tight">Earnings</span>
           </div>
           <nav aria-label="Main" className="flex flex-col gap-1">
-            {primaryNav.slice(0, 3).map((n) => (
+            {primaryNav.slice(0, 4).map((n) => (
               <NavLink key={n.href} {...n} variant="side" />
             ))}
             <div className="my-2 h-px bg-line" />
@@ -109,7 +111,7 @@ function Shell() {
               <NavLink key={n.href} {...n} variant="side" />
             ))}
             <div className="my-2 h-px bg-line" />
-            <NavLink {...primaryNav[3]} variant="side" />
+            <NavLink {...primaryNav[4]} variant="side" />
           </nav>
           <button
             type="button"
@@ -125,6 +127,7 @@ function Shell() {
             <Route path="/" component={Dashboard} />
             <Route path="/time" component={TimeLog} />
             <Route path="/payments" component={Payments} />
+            <Route path="/history" component={History} />
             <Route path="/rates" component={RatesSchedule} />
             <Route path="/what-if" component={WhatIf} />
             <Route path="/share" component={Share} />

@@ -10,7 +10,8 @@ import {
   formatRate,
   formatUSD,
   isISODate,
-  monthOf,
+  periodOf,
+  periodStart,
   monthTargetSeconds,
   parseScaled,
   rate4On,
@@ -60,14 +61,23 @@ function RateChangeForm({ initial, onDone }: { initial?: number; onDone: () => v
   const valid = rate4 !== null && rate4 > 0 && (mode !== 'from-date' || isISODate(date))
   const trimmedNote = note.trim() || undefined
   const change = useMemo<RateChange | null>(
-    () => (valid && rate4 ? { id, amount: rate4 / 10_000, mode, date, month, note: trimmedNote } : null),
-    [valid, rate4, id, mode, date, month, trimmedNote],
+    () =>
+      valid && rate4
+        ? { id, amount: rate4 / 10_000, mode, date, month, startDay: schedule.periodStartDay, note: trimmedNote }
+        : null,
+    [valid, rate4, id, mode, date, month, schedule.periodStartDay, trimmedNote],
   )
   const next = useMemo(() => (change ? applyRateChange(rates, change) : rates), [change, rates])
   const countTodayAsWorked = settings.countTodayAsWorked
   const impact = useMemo(() => {
     if (!change || step !== 'confirm') return []
-    const months = [...entries.map((e) => monthOf(e.date)), ...periodTotals.map((p) => p.month), month, monthOf(today)]
+    const sd = schedule.periodStartDay
+    const months = [
+      ...entries.map((e) => periodOf(e.date, sd)),
+      ...periodTotals.map((p) => periodOf(p.endDate, sd)),
+      month,
+      periodOf(today, sd),
+    ]
     return rateChangeImpact(months, { entries, periodTotals, schedule, today, countTodayAsWorked }, rates, next)
   }, [change, step, entries, periodTotals, month, today, schedule, countTodayAsWorked, rates, next])
 
@@ -160,7 +170,7 @@ function RateChangeForm({ initial, onDone }: { initial?: number; onDone: () => v
 
   const modes: Array<{ value: RateChangeMode; label: string; hint: string }> = [
     { value: 'from-date', label: 'From a chosen date', hint: 'Dates before it keep the old rate.' },
-    { value: 'month-start', label: `From the start of ${formatMonth(month)}`, hint: `Applies from ${formatDate(`${month}-01`)} onward.` },
+    { value: 'month-start', label: `From the start of ${formatMonth(month)}`, hint: `Applies from ${formatDate(periodStart(month, schedule.periodStartDay))} onward.` },
     {
       value: 'whole-month',
       label: `All of ${formatMonth(month)}`,

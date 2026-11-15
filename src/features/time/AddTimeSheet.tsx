@@ -8,7 +8,7 @@ import {
   deriveRate,
   earnCents,
   eachDay,
-  firstOfMonth,
+  cardFor,
   formatHMS,
   formatHours,
   formatRange,
@@ -29,7 +29,7 @@ import {
   type TimeEntry,
 } from '@/engine'
 import { newId, useData } from '@/store/data'
-import { useFormat, useSchedule, useToday } from '@/store/hooks'
+import { useFormat, usePeriod, useSchedule, useToday } from '@/store/hooks'
 import { useUI, type AddTimeTab } from '@/store/ui'
 import { AffixInput, Button, Field, Input, Notice, Segmented, Sheet, Switch, cn } from '@/components/ui'
 import { undoToast } from '@/lib/toast'
@@ -83,11 +83,12 @@ export function AddTimeSheet() {
   )
 }
 
-/** A date inside the selected month: today if it's in the month, else the 1st. */
+/** A date inside the selected pay period: today if it's in the period, else its first day. */
 function useDefaultDate(): ISODate {
   const today = useToday()
+  const period = usePeriod()
   const month = useUI((s) => s.month)
-  return monthOf(today) === month ? today : firstOfMonth(month)
+  return period.of(today) === month ? today : period.start(month)
 }
 
 function FormFooter({ children }: { children: ReactNode }) {
@@ -135,6 +136,7 @@ function SingleForm({ editing, defaultDate, onDone }: { editing?: TimeEntry; def
     })),
   )
   const schedule = useSchedule()
+  const period = usePeriod()
   const fallbackDate = useDefaultDate()
   const [date, setDate] = useState(editing?.date ?? defaultDate ?? fallbackDate)
   const [duration, setDuration] = useState(editing ? formatHMS(editing.seconds) : formatHMS(Math.round(dailyTargetHours * 3600)))
@@ -145,7 +147,7 @@ function SingleForm({ editing, defaultDate, onDone }: { editing?: TimeEntry; def
   const seconds = parseDuration(duration)
   const validDate = isISODate(date)
   const rate4 = validDate ? rate4On(date, rates) : 0
-  const card = periodTotals.find((p) => validDate && p.month === monthOf(date))
+  const card = validDate ? cardFor(period.of(date), periodTotals, period.startDay) : null
   const covered = type === 'tracked' && card && date >= card.startDate && date <= card.endDate
   const extra = validDate && !isWorkingDay(date, schedule)
   const durationError = touched && seconds === null ? 'Use 8:00:00, 8:00 or 8.5' : seconds === 0 && touched ? 'Duration can’t be zero' : null
@@ -243,8 +245,9 @@ function BackfillForm({ onDone }: { onDone: () => void }) {
   )
   const schedule = useSchedule()
   const month = useUI((s) => s.month)
+  const period = usePeriod()
   const defaultDate = useDefaultDate()
-  const [start, setStart] = useState(firstOfMonth(month))
+  const [start, setStart] = useState(period.start(month))
   const [end, setEnd] = useState(defaultDate)
   const [hours, setHours] = useState(formatHMS(Math.round(dailyTargetHours * 3600)))
   const [skip, setSkip] = useState(true)
@@ -345,33 +348,33 @@ function CardForm({ editing, onDone }: { editing?: PeriodTotal; onDone: () => vo
   const f = useFormat()
   const today = useToday()
   const month = useUI((s) => s.month)
-  const thisMonth = monthOf(today)
-  const defaultEnd = thisMonth === month ? today : month < thisMonth ? lastOfMonth(month) : firstOfMonth(month)
+  const period = usePeriod()
+  const defaultEnd = period.current === month ? today : month < period.current ? period.end(month) : period.start(month)
   const [time, setTime] = useState(editing ? formatHMS(editing.seconds) : '')
   const [earned, setEarned] = useState(editing ? (editing.trackerEarnedCents / 100).toFixed(2) : '')
-  const previous = periodTotals.find((p) => p.month === month)
-  const [start, setStart] = useState(editing?.startDate ?? previous?.startDate ?? firstOfMonth(month))
+  const previous = cardFor(month, periodTotals, period.startDay)
+  const [start, setStart] = useState(editing?.startDate ?? previous?.startDate ?? period.start(month))
   const [end, setEnd] = useState(editing?.endDate ?? defaultEnd)
   const [touched, setTouched] = useState(false)
 
   const seconds = parseDuration(time)
   const cents = parseCents(earned)
-  const cardMonth = isISODate(end) ? monthOf(end) : month
-  const datesValid = isISODate(start) && isISODate(end) && start <= end && monthOf(start) === cardMonth
+  const cardMonth = isISODate(end) ? period.of(end) : month
+  const datesValid = isISODate(start) && isISODate(end) && start <= end && period.of(start) === cardMonth
   const derived = seconds && seconds > 0 && cents !== null && cents > 0 ? deriveRate(seconds, cents) : null
   const saved4 = datesValid ? rate4On(end, rates) : 0
   const differs = derived && saved4 > 0 && rateDifference(derived.rate4, saved4) > 0.01
-  const existing = periodTotals.find((p) => p.month === cardMonth && p.id !== editing?.id)
+  const existing = periodTotals.find((p) => period.of(p.endDate) === cardMonth && p.id !== editing?.id)
 
   const submit = (e: FormEvent) => {
     e.preventDefault()
     setTouched(true)
     if (!seconds || seconds <= 0 || cents === null || !datesValid) return
     const card = { month: cardMonth, startDate: start, endDate: end, seconds, trackerEarnedCents: cents, trust: editing?.trust ?? ('tracker' as const) }
-    const undoCard = saveCard(card)
+    const undoCard = saveCard(card, editing?.id)
     if (rates.length === 0 && derived) {
       const undoRate = setRates([
-        { id: newId(), amount: derived.rate4 / 10_000, effectiveFrom: firstOfMonth(cardMonth), note: 'Derived from tracker' },
+        { id: newId(), amount: derived.rate4 / 10_000, effectiveFrom: period.start(cardMonth), note: 'Derived from tracker' },
       ])
       undoToast(`Saved tracker total and set your rate to ${formatRate(derived.rate4)}/h`, () => {
         undoRate()
@@ -389,7 +392,8 @@ function CardForm({ editing, onDone }: { editing?: PeriodTotal; onDone: () => vo
   return (
     <form onSubmit={submit} className="flex flex-col gap-4" noValidate>
       <p className="text-sm text-muted">
-        Copy the totals from your tracker's schedule card. Pasting a newer reading for the same month replaces the old one.
+        Copy the totals from your tracker's schedule card. Pasting a newer reading for the same {period.custom ? 'pay period' : 'month'}{' '}
+        replaces the old one.
       </p>
       <div className="grid grid-cols-2 gap-3">
         <Field label="Total time" htmlFor="card-time" error={touched && !seconds ? 'e.g. 62:41:12' : null}>
@@ -412,7 +416,14 @@ function CardForm({ editing, onDone }: { editing?: PeriodTotal; onDone: () => vo
         <Field label="First day tracked" htmlFor="card-start" hint="Optional">
           <Input id="card-start" type="date" value={start} onChange={(e) => setStart(e.target.value)} />
         </Field>
-        <Field label="As of" htmlFor="card-end" error={!datesValid && touched ? 'Both dates must be in the same month' : null}>
+        <Field label="As of" htmlFor="card-end" error={
+            !datesValid && touched
+              ? period.custom
+                ? `Both dates must be in one pay period (${period.range(cardMonth)})`
+                : 'Both dates must be in the same month'
+              : null
+          }
+        >
           <Input id="card-end" type="date" value={end} onChange={(e) => setEnd(e.target.value)} />
         </Field>
       </div>
@@ -446,7 +457,7 @@ function CardForm({ editing, onDone }: { editing?: PeriodTotal; onDone: () => vo
           {(rateDifference(derived.rate4, saved4) * 100).toFixed(1)}% different). After saving you can update your rate.
         </Notice>
       )}
-      {rates.length === 0 && derived && <Notice tone="info">Your hourly rate will be set to {formatRate(derived.rate4, derived.decimals)}/h from {formatShortDate(firstOfMonth(cardMonth))}.</Notice>}
+      {rates.length === 0 && derived && <Notice tone="info">Your hourly rate will be set to {formatRate(derived.rate4, derived.decimals)}/h from {formatShortDate(period.start(cardMonth))}.</Notice>}
       {existing && (
         <Notice tone="info">
           Replaces the reading as of {formatShortDate(existing.endDate)} ({formatHMS(existing.seconds)}, {formatUSD(existing.trackerEarnedCents)}).

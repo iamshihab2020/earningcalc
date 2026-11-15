@@ -1,4 +1,4 @@
-import { firstOfMonth, lastOfMonth, monthOf } from './dates'
+import { periodEnd, periodOf, periodStart } from './dates'
 import { earnCents } from './money'
 import { rate4On } from './rates'
 import {
@@ -39,7 +39,11 @@ export interface CardValuation {
 }
 
 export interface MonthSummary {
+  /** Pay-period key (see `Schedule.periodStartDay`). */
   month: YearMonth
+  /** First and last day of the period. */
+  start: ISODate
+  end: ISODate
   /** The date "now" is measured from inside this month. */
   refDate: ISODate
   entries: ValuedEntry[]
@@ -66,11 +70,23 @@ export interface MonthInput {
   countTodayAsWorked?: boolean
 }
 
-/** Today if it falls in the month, else the month's nearest edge. */
-export function refDateFor(month: YearMonth, today: ISODate): ISODate {
-  const first = firstOfMonth(month)
-  const last = lastOfMonth(month)
+/** Today if it falls in the period, else the period's nearest edge. */
+export function refDateFor(month: YearMonth, today: ISODate, startDay = 1): ISODate {
+  const first = periodStart(month, startDay)
+  const last = periodEnd(month, startDay)
   return today < first ? first : today > last ? last : today
+}
+
+/**
+ * The tracker total that counts for a period: the one whose "as of" date falls
+ * in it. If several do (after the period start day changed), the latest wins.
+ */
+export function cardFor(month: YearMonth, periodTotals: PeriodTotal[], startDay = 1): PeriodTotal | null {
+  let best: PeriodTotal | null = null
+  for (const p of periodTotals) {
+    if (periodOf(p.endDate, startDay) === month && (!best || p.endDate > best.endDate)) best = p
+  }
+  return best
 }
 
 /**
@@ -104,14 +120,22 @@ export function valueCard(card: PeriodTotal, rates: RatePeriod[], schedule: Sche
   }
 }
 
+/** Tracker totals that don't count because a newer one ends in the same period. */
+export function uncountedCards(periodTotals: PeriodTotal[], startDay = 1): PeriodTotal[] {
+  return periodTotals
+    .filter((p) => cardFor(periodOf(p.endDate, startDay), periodTotals, startDay) !== p)
+    .sort((a, b) => (a.endDate < b.endDate ? -1 : 1))
+}
+
 export function summarizeMonth(month: YearMonth, input: MonthInput): MonthSummary {
   const { rates, schedule, today } = input
+  const startDay = schedule.periodStartDay ?? 1
   const holidays = holidaySet(schedule)
-  const card = input.periodTotals.find((p) => p.month === month) ?? null
+  const card = cardFor(month, input.periodTotals, startDay)
   const cardValue = card ? valueCard(card, rates, schedule) : null
 
   const entries: ValuedEntry[] = input.entries
-    .filter((e) => monthOf(e.date) === month)
+    .filter((e) => periodOf(e.date, startDay) === month)
     .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0))
     .map((entry) => {
       const rate4 = rate4On(entry.date, rates)
@@ -149,10 +173,12 @@ export function summarizeMonth(month: YearMonth, input: MonthInput): MonthSummar
 
   const workingDays = monthWorkingDays(month, schedule)
   const daily = dailyTargetSeconds(schedule)
-  const refDate = refDateFor(month, today)
+  const refDate = refDateFor(month, today, startDay)
 
   return {
     month,
+    start: periodStart(month, startDay),
+    end: periodEnd(month, startDay),
     refDate,
     entries,
     card: cardValue,

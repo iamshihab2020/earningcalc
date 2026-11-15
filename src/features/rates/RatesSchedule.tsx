@@ -18,7 +18,9 @@ import {
   monthTargetSeconds,
   monthWorkingDays,
   parseCents,
+  ordinal,
   parseDuration,
+  periodOf,
   rate4On,
   rateDifference,
   rateTimeline,
@@ -26,11 +28,12 @@ import {
   weekday,
 } from '@/engine'
 import { useData } from '@/store/data'
-import { useSchedule, useToday } from '@/store/hooks'
+import { usePeriod, useSchedule, useToday } from '@/store/hooks'
 import { useUI } from '@/store/ui'
 import { MonthSelector } from '@/components/MonthSelector'
-import { AffixInput, Button, Card, CardHeader, Field, Input, Notice, PageHeader, cn } from '@/components/ui'
+import { AffixInput, Button, Card, CardHeader, Field, Input, Notice, PageHeader, Select, cn } from '@/components/ui'
 import { undoToast } from '@/lib/toast'
+import { UncountedCardsNotice } from '@/features/shared'
 
 const WEEK = [
   { n: 1, short: 'Mon' },
@@ -179,9 +182,17 @@ function DeriveCard() {
 function ScheduleCard() {
   const { settings, updateSettings } = useData(useShallow((s) => ({ settings: s.settings, updateSettings: s.updateSettings })))
   const schedule = useSchedule()
-  const month = useUI((s) => s.month)
+  const { month, setMonth } = useUI(useShallow((s) => ({ month: s.month, setMonth: s.setMonth })))
+  const period = usePeriod()
+  const today = useToday()
   const days = monthWorkingDays(month, schedule).length
   const [hours, setHours] = useState(String(settings.dailyTargetHours))
+
+  const setStartDay = (day: number) => {
+    updateSettings({ periodStartDay: day })
+    setMonth(periodOf(today, day))
+  }
+  const currentRange = period.range(period.current)
 
   const toggle = (n: number) => {
     const set = new Set(settings.workingDays)
@@ -216,7 +227,25 @@ function ScheduleCard() {
             })}
           </div>
         </fieldset>
-        <Field label="Daily target" htmlFor="daily-target" hint="Used for projections, backfill and the monthly target.">
+        <Field
+          label="Pay period starts on"
+          htmlFor="period-start"
+          hint={
+            currentRange
+              ? `Each period runs from the ${ordinal(period.startDay)} to the ${ordinal(period.startDay - 1)}. This one: ${currentRange}.`
+              : 'Calendar months. Pick another day if your pay or report period runs, say, 26th to 25th.'
+          }
+        >
+          <Select id="period-start" value={period.startDay} onChange={(e) => setStartDay(Number(e.target.value))} className="max-w-60">
+            {Array.from({ length: 28 }, (_, i) => i + 1).map((d) => (
+              <option key={d} value={d}>
+                {d === 1 ? '1st (calendar month)' : `${ordinal(d)} of the month`}
+              </option>
+            ))}
+          </Select>
+        </Field>
+        <UncountedCardsNotice />
+        <Field label="Daily target" htmlFor="daily-target" hint="Used for projections, backfill and the period's target.">
           <AffixInput
             id="daily-target"
             suffix="h/day"
@@ -231,7 +260,7 @@ function ScheduleCard() {
           />
         </Field>
         <p className="num rounded-[12px] bg-surface-2 px-4 py-3 text-[0.9375rem]">
-          {formatMonth(month)}: <strong>{days}</strong> working days × {settings.dailyTargetHours} h ={' '}
+          {period.label(month)}: <strong>{days}</strong> working days × {settings.dailyTargetHours} h ={' '}
           <strong>{formatHours(monthTargetSeconds(month, schedule), 0)} h</strong>
         </p>
       </div>

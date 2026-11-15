@@ -11,7 +11,7 @@ import {
   rateOn,
 } from '@/engine'
 import { hasAnyData, loadSample, useData } from '@/store/data'
-import { useFormat, useMonthView } from '@/store/hooks'
+import { useFormat, useMonthView, usePeriod } from '@/store/hooks'
 import { useUI } from '@/store/ui'
 import { MonthSelector } from '@/components/MonthSelector'
 import { Button, Card, CardHeader, EmptyState, Notice, Stat, Switch, cn } from '@/components/ui'
@@ -61,13 +61,14 @@ function Welcome() {
 
 function MonthDashboard({ month }: { month: string }) {
   const view = useMonthView(month)
-  const { summary: s, scenarios: sc, recon, today, settings, rates } = view
+  const { summary: s, scenarios: sc, recon, settings, rates } = view
   const f = useFormat()
   const { openAddTime, setPaymentOpen, openRateChange, projectionHours, setProjectionHours } = useUI()
   const updateSettings = useData((st) => st.updateSettings)
 
-  const isCurrent = today.slice(0, 7) === month
-  const isPast = today.slice(0, 7) > month
+  const { current, custom } = usePeriod()
+  const isCurrent = current === month
+  const isPast = current > month
   const hoursPerDay = projectionHours ?? settings.dailyTargetHours
   const pct = s.targetSeconds ? Math.min(100, Math.round((s.workedSeconds / s.targetSeconds) * 100)) : 0
   const ahead = isPast ? s.workedSeconds - s.targetSeconds : sc.aheadSeconds
@@ -94,7 +95,7 @@ function MonthDashboard({ month }: { month: string }) {
         <Card className="p-5 sm:p-6 lg:col-span-8" data-testid="hero">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <h2 className="text-xs font-semibold tracking-wider text-muted uppercase">
-              {isCurrent ? 'Earned this month' : `Earned in ${formatMonth(month)}`}
+              {isCurrent ? `Earned this ${custom ? 'period' : 'month'}` : `Earned in ${formatMonth(month)}`}
             </h2>
             <AheadChip seconds={ahead} />
           </div>

@@ -1,4 +1,4 @@
-import { formatMonth, formatShortDate } from './dates'
+import { formatMonth, formatRange, formatShortDate } from './dates'
 import { formatHMS, formatHours, formatHoursShort } from './duration'
 import { convertCents, formatLocal, formatRate, formatSignedUSD, formatUSD } from './money'
 import type { MonthSummary } from './month'
@@ -41,7 +41,8 @@ export function buildMessage(input: MessageInput): string {
   const local = (cents: number) => formatLocal(convertCents(cents, fx), symbol)
   const lines: string[] = []
 
-  lines.push(`*Earnings summary — ${formatMonth(s.month)}*${input.name ? ` (${input.name})` : ''}`, '')
+  const range = s.start.endsWith('-01') ? '' : ` (${formatRange(s.start, s.end)})`
+  lines.push(`*Earnings summary — ${formatMonth(s.month)}${range}*${input.name ? ` (${input.name})` : ''}`, '')
   lines.push('*Hours*')
   if (s.seconds.card) lines.push(hoursLine('Tracked (tracker total)', s.seconds.card))
   if (s.seconds.tracked) lines.push(hoursLine(s.seconds.card ? 'Tracked (other days)' : 'Tracked', s.seconds.tracked))

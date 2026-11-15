@@ -12,7 +12,7 @@ import {
   type PaymentCurrency,
 } from '@/engine'
 import { useData } from '@/store/data'
-import { useToday } from '@/store/hooks'
+import { usePeriod, useToday } from '@/store/hooks'
 import { useUI } from '@/store/ui'
 import { AffixInput, Button, Field, Input, Segmented, Sheet } from '@/components/ui'
 import { undoToast } from '@/lib/toast'
@@ -39,6 +39,7 @@ function PaymentForm({ editing, onDone }: { editing: Payment | null; onDone: () 
   )
   const today = useToday()
   const selected = useUI((s) => s.month)
+  const period = usePeriod()
   const [date, setDate] = useState(editing?.date ?? today)
   const [amount, setAmount] = useState(editing ? (editing.amountCents / 100).toFixed(2) : '')
   const [currency, setCurrency] = useState<PaymentCurrency>(editing?.currency ?? 'USD')
@@ -115,7 +116,7 @@ function PaymentForm({ editing, onDone }: { editing: Payment | null; onDone: () 
         <Field label="Date received" htmlFor="pay-date">
           <Input id="pay-date" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
         </Field>
-        <Field label="Pays for" htmlFor="pay-month" hint="The month of work">
+        <Field label="Pays for" htmlFor="pay-month" hint={period.range(month) ?? 'The month of work'}>
           <Input id="pay-month" type="month" value={month} onChange={(e) => setMonth(e.target.value)} />
         </Field>
       </div>

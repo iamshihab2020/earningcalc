@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { createJSONStorage, persist } from 'zustand/middleware'
 import {
-  firstOfMonth,
+  periodOf,
   todayISO,
   type AppData,
   type DayOff,
@@ -41,6 +41,7 @@ export const defaultSettings = (): Settings => ({
   timeFormat: 'hms',
   theme: 'system',
   countTodayAsWorked: true,
+  periodStartDay: 1,
 })
 
 export const emptyData = (): AppData => ({
@@ -58,7 +59,8 @@ interface Actions {
   updateEntry(entry: TimeEntry): Undo
   deleteEntry(id: string): Undo
   /** Save a tracker reading; replaces any existing reading for that month. */
-  saveCard(card: Omit<PeriodTotal, 'id'>): Undo
+  /** Save a tracker total, replacing the one in its pay period (and `replaceId`, when editing). */
+  saveCard(card: Omit<PeriodTotal, 'id'>, replaceId?: string): Undo
   updateCard(card: PeriodTotal): Undo
   deleteCard(id: string): Undo
   setRates(rates: RatePeriod[]): Undo
@@ -130,11 +132,15 @@ export const useData = create<DataStore>()(
         updateEntry: (entry) => commit([{ key: 'entries', before: find('entries', entry.id), after: entry }]),
         deleteEntry: (id) => commit([{ key: 'entries', before: find('entries', id), after: null }]),
 
-        saveCard: (card) => {
-          const existing = get().periodTotals.filter((p) => p.month === card.month)
+        saveCard: (card, replaceId) => {
+          // One tracker total per pay period: the one whose "as of" date is in it.
+          const startDay = get().settings.periodStartDay
+          const month = periodOf(card.endDate, startDay)
+          const existing = get().periodTotals.filter((p) => p.id === replaceId || periodOf(p.endDate, startDay) === month)
+          const saved: PeriodTotal = { ...card, month, id: newId() }
           return commit([
             ...existing.map((p) => ({ key: 'periodTotals' as const, before: p, after: null })),
-            { key: 'periodTotals', before: null, after: { ...card, id: newId() } },
+            { key: 'periodTotals', before: null, after: saved },
           ])
         },
         updateCard: (card) => commit([{ key: 'periodTotals', before: find('periodTotals', card.id), after: card }]),
@@ -161,7 +167,14 @@ export const useData = create<DataStore>()(
         updatePayment: (payment) => commit([{ key: 'payments', before: find('payments', payment.id), after: payment }]),
         deletePayment: (id) => commit([{ key: 'payments', before: find('payments', id), after: null }]),
 
-        updateSettings: (patch) => set((s) => ({ settings: { ...s.settings, ...patch } })),
+        updateSettings: (patch) =>
+          set((s) => {
+            const settings = { ...s.settings, ...patch }
+            if (settings.periodStartDay === s.settings.periodStartDay) return { settings }
+            // Keep each tracker total's period key in step with the new period boundaries.
+            const periodTotals = s.periodTotals.map((p) => ({ ...p, month: periodOf(p.endDate, settings.periodStartDay) }))
+            return { settings, periodTotals }
+          }),
 
         replaceAll: (data) => {
           const undo = snapshotUndo()
@@ -194,5 +207,3 @@ export const loadSample = () => useData.getState().replaceAll(sampleData(newId))
 
 export const hasAnyData = (s: AppData) =>
   s.rates.length > 0 || s.entries.length > 0 || s.periodTotals.length > 0 || s.payments.length > 0
-
-export const currentMonthStart = () => firstOfMonth(todayISO().slice(0, 7))

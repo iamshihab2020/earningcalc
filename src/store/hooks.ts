@@ -5,10 +5,17 @@ import {
   convertCents,
   formatDuration,
   formatLocal,
+  formatMonth,
+  formatPeriod,
+  formatPeriodRange,
+  periodEnd,
+  periodOf,
+  periodStart,
   reconcile,
   scheduleFrom,
   summarizeMonth,
   todayISO,
+  type ISODate,
   type Schedule,
   type YearMonth,
 } from '@/engine'
@@ -31,14 +38,44 @@ export function useToday() {
 }
 
 export function useSchedule(): Schedule {
-  const { workingDays, dailyTargetHours, daysOff } = useData(
+  const { workingDays, dailyTargetHours, periodStartDay, daysOff } = useData(
     useShallow((s) => ({
       workingDays: s.settings.workingDays,
       dailyTargetHours: s.settings.dailyTargetHours,
+      periodStartDay: s.settings.periodStartDay,
       daysOff: s.daysOff,
     })),
   )
-  return useMemo(() => scheduleFrom({ workingDays, dailyTargetHours }, daysOff), [workingDays, dailyTargetHours, daysOff])
+  return useMemo(
+    () => scheduleFrom({ workingDays, dailyTargetHours, periodStartDay }, daysOff),
+    [workingDays, dailyTargetHours, periodStartDay, daysOff],
+  )
+}
+
+/**
+ * Pay-period helpers bound to the user's start day. A period is keyed by the
+ * month it ends in; with start day 1 it is simply the calendar month.
+ */
+export function usePeriod() {
+  const startDay = useData((s) => s.settings.periodStartDay)
+  const today = useToday()
+  return useMemo(
+    () => ({
+      startDay,
+      custom: startDay > 1,
+      current: periodOf(today, startDay),
+      of: (date: ISODate) => periodOf(date, startDay),
+      start: (key: YearMonth) => periodStart(key, startDay),
+      end: (key: YearMonth) => periodEnd(key, startDay),
+      /** "November 2026" */
+      name: (key: YearMonth) => formatMonth(key),
+      /** "Oct 26 – Nov 25", or null for calendar months */
+      range: (key: YearMonth) => formatPeriodRange(key, startDay),
+      /** "November 2026 (Oct 26 – Nov 25)" */
+      label: (key: YearMonth) => formatPeriod(key, startDay),
+    }),
+    [startDay, today],
+  )
 }
 
 /** Everything a screen needs about one month, recomputed only when inputs change. */

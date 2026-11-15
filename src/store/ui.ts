@@ -1,5 +1,6 @@
 import { create } from 'zustand'
-import { addMonths, todayISO, type ISODate, type Payment, type PeriodTotal, type TimeEntry, type YearMonth } from '@/engine'
+import { addMonths, periodOf, todayISO, type ISODate, type Payment, type PeriodTotal, type TimeEntry, type YearMonth } from '@/engine'
+import { useData } from './data'
 
 export type AddTimeTab = 'single' | 'backfill' | 'card'
 
@@ -26,7 +27,8 @@ interface UIState {
 }
 
 export const useUI = create<UIState>()((set) => ({
-  month: todayISO().slice(0, 7),
+  // The pay period that contains today (persisted settings are already loaded from localStorage).
+  month: periodOf(todayISO(), useData.getState().settings.periodStartDay),
   setMonth: (month) => set({ month }),
   shiftMonth: (delta) => set((s) => ({ month: addMonths(s.month, delta) })),
 

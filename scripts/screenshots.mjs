@@ -38,6 +38,7 @@ for (const dark of [false, true]) {
   if (!dark) {
     await shot(page, '/payments', 'payments', prevMonth)
     await shot(page, '/what-if', 'what-if')
+    await shot(page, '/history', 'history')
   }
   await ctx.close()
 }

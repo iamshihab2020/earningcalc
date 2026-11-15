@@ -1,14 +1,15 @@
 import { useRef } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { formatMonth } from '@/engine'
-import { useToday } from '@/store/hooks'
+import { usePeriod } from '@/store/hooks'
 import { useUI } from '@/store/ui'
 import { Button } from './ui'
 
 export function MonthSelector() {
   const { month, setMonth, shiftMonth } = useUI()
-  const today = useToday()
-  const current = today.slice(0, 7)
+  const period = usePeriod()
+  const current = period.current
+  const range = period.range(month)
   const picker = useRef<HTMLInputElement>(null)
 
   return (
@@ -19,11 +20,12 @@ export function MonthSelector() {
       <div className="relative">
         <button
           type="button"
-          className="min-h-11 whitespace-nowrap rounded-[12px] px-2 text-lg font-semibold tracking-tight hover:bg-surface-2"
+          className="flex min-h-11 flex-col items-start justify-center whitespace-nowrap rounded-[12px] px-2 text-lg leading-tight font-semibold tracking-tight hover:bg-surface-2"
           onClick={() => picker.current?.showPicker?.() ?? picker.current?.focus()}
-          aria-label={`${formatMonth(month)}. Jump to month`}
+          aria-label={`${period.label(month)}. Jump to month`}
         >
           {formatMonth(month)}
+          {range && <span className="text-xs font-medium tracking-normal text-muted">{range}</span>}
         </button>
         <input
           ref={picker}

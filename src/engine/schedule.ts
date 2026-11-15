@@ -1,8 +1,16 @@
-import { addDays, eachDay, firstOfMonth, lastOfMonth, monthDays, monthOf, weekday } from './dates'
+import { addDays, eachDay, periodDays, periodEnd, periodOf, periodStart, weekday } from './dates'
 import type { DayOff, ISODate, Schedule, Settings, YearMonth } from './types'
 
-export function scheduleFrom(settings: Pick<Settings, 'workingDays' | 'dailyTargetHours'>, daysOff: DayOff[]): Schedule {
-  return { workingDays: settings.workingDays, dailyTargetHours: settings.dailyTargetHours, daysOff }
+export function scheduleFrom(
+  settings: Pick<Settings, 'workingDays' | 'dailyTargetHours'> & { periodStartDay?: number },
+  daysOff: DayOff[],
+): Schedule {
+  return {
+    workingDays: settings.workingDays,
+    dailyTargetHours: settings.dailyTargetHours,
+    daysOff,
+    periodStartDay: settings.periodStartDay ?? 1,
+  }
 }
 
 export function holidaySet(schedule: Schedule): Set<ISODate> {
@@ -18,9 +26,10 @@ export function workingDaysBetween(start: ISODate, end: ISODate, schedule: Sched
   return eachDay(start, end).filter((d) => isWorkingDay(d, schedule, holidays))
 }
 
+/** Working days in the pay period `month` (the calendar month when periods start on the 1st). */
 export function monthWorkingDays(month: YearMonth, schedule: Schedule): ISODate[] {
   const holidays = holidaySet(schedule)
-  return monthDays(month).filter((d) => isWorkingDay(d, schedule, holidays))
+  return periodDays(month, schedule.periodStartDay).filter((d) => isWorkingDay(d, schedule, holidays))
 }
 
 export const dailyTargetSeconds = (schedule: Pick<Schedule, 'dailyTargetHours'>) =>
@@ -41,8 +50,8 @@ export function remainingWorkingDays(
   countTodayAsWorked = true,
 ): ISODate[] {
   const from = countTodayAsWorked ? addDays(today, 1) : today
-  const first = firstOfMonth(month)
-  const last = lastOfMonth(month)
+  const first = periodStart(month, schedule.periodStartDay)
+  const last = periodEnd(month, schedule.periodStartDay)
   if (from > last) return []
   return workingDaysBetween(from > first ? from : first, last, schedule)
 }
@@ -53,4 +62,4 @@ export function backfillDates(start: ISODate, end: ISODate, schedule: Schedule, 
   return skipDaysOff ? workingDaysBetween(start, end, schedule) : eachDay(start, end)
 }
 
-export const isInMonth = (date: ISODate, month: YearMonth) => monthOf(date) === month
+export const isInMonth = (date: ISODate, month: YearMonth, startDay = 1) => periodOf(date, startDay) === month

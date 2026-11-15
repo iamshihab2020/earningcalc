@@ -39,6 +39,9 @@ export function Statement() {
           <div>
             <p className="text-xs font-semibold tracking-wider text-muted uppercase">Earnings statement</p>
             <h1 className="mt-1 text-2xl font-semibold">{formatMonth(month)}</h1>
+            <p className="mt-0.5 text-sm text-muted">
+              {formatDate(s.start)} – {formatDate(s.end)}
+            </p>
             {settings.name && <p className="mt-1 text-muted">{settings.name}</p>}
           </div>
           <p className="text-sm text-muted">Prepared {formatDate(today)}</p>

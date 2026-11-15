@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Plus, X } from 'lucide-react'
 import {
+  addMonths,
   compareRates,
   earnCents,
   formatHours,
@@ -16,7 +17,7 @@ import {
   valueDays,
   type Schedule,
 } from '@/engine'
-import { useFormat, useMonthView, useSchedule, useToday } from '@/store/hooks'
+import { useFormat, useMonthView, usePeriod, useSchedule } from '@/store/hooks'
 import { useUI } from '@/store/ui'
 import { MonthSelector } from '@/components/MonthSelector'
 import { AffixInput, Card, CardHeader, Chip, Field, Input, PageHeader, cn } from '@/components/ui'
@@ -257,12 +258,9 @@ function RateComparison({ standardSeconds, projectedSeconds, currentRate4 }: { s
 
 function OfferCalculator({ currentRate4 }: { currentRate4: number }) {
   const schedule = useSchedule()
-  const today = useToday()
+  const period = usePeriod()
   const [amount, setAmount] = useState('800')
-  const [month, setMonth] = useState(() => {
-    const [y, m] = today.split('-').map(Number)
-    return m === 12 ? `${y + 1}-01` : `${y}-${String(m + 1).padStart(2, '0')}`
-  })
+  const [month, setMonth] = useState(() => addMonths(period.current, 1))
   const [hours, setHours] = useState('8')
   const cents = parseCents(amount)
   const h = Number(hours)
@@ -287,7 +285,7 @@ function OfferCalculator({ currentRate4 }: { currentRate4: number }) {
         {result && result.seconds > 0 && (
           <div className="rounded-[12px] bg-surface-2 p-4">
             <p className="num text-sm text-fg">
-              {result.workingDays} working days × {h} h = {formatHours(result.seconds, 0)} h in {formatMonth(month)}
+              {result.workingDays} working days × {h} h = {formatHours(result.seconds, 0)} h in {period.label(month)}
             </p>
             <p className="num mt-1 text-3xl font-semibold">{formatRate(result.rate4)}/h</p>
             {currentRate4 > 0 && Math.abs(diff) >= 50 && (

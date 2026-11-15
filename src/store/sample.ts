@@ -21,6 +21,7 @@ export function sampleData(id: () => string): AppData {
       timeFormat: 'hms',
       theme: 'system',
       countTodayAsWorked: true,
+      periodStartDay: 1,
     },
     rates: [{ id: id(), amount: 4.38, effectiveFrom: '2026-10-01', note: 'Derived from tracker' }],
     entries: backfillDates('2026-10-01', '2026-10-09', schedule).map((date) => ({

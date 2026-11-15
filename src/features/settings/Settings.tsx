@@ -32,7 +32,7 @@ export function SettingsPage() {
 
 function MoreLinks() {
   const items: Array<{ href: string; label: string; hint: string; icon: typeof Gauge }> = [
-    { href: '/rates', label: 'Rate & schedule', hint: 'Rate history, working days, holidays', icon: Gauge },
+    { href: '/rates', label: 'Rate & schedule', hint: 'Rate history, working days, pay period, holidays', icon: Gauge },
     { href: '/what-if', label: 'What-if', hint: 'Scenarios, rate comparison, offers', icon: Calculator },
     { href: '/share', label: 'Share & export', hint: 'Message for your manager, CSV, statement', icon: Share2 },
   ]

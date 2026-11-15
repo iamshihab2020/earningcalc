@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest'
 import {
   applyRateChange,
   backfillDates,
+  buildHistory,
   buildMessage,
+  clampStartDay,
   buildScenarios,
   compareRates,
   convertCents,
@@ -12,13 +14,18 @@ import {
   formatHMS,
   formatHours,
   formatLocal,
+  formatPeriod,
   formatRate,
   formatUSD,
+  historyToCSV,
   monthTargetSeconds,
   monthToCSV,
   monthWorkingDays,
   offerRate,
   paceCheck,
+  periodEnd,
+  periodOf,
+  periodStart,
   parseBackup,
   parseCents,
   parseDuration,
@@ -29,6 +36,7 @@ import {
   summarizeMonth,
   toRate4,
   toUsdCents,
+  uncountedCards,
   type MonthInput,
   type PeriodTotal,
   type RatePeriod,
@@ -448,5 +456,85 @@ describe('summary message and backups', () => {
     const csv = monthToCSV(s)
     expect(csv).toContain(`"'=HYPERLINK(""http://x"",""y"")"`)
     expect(csv).toContain('adjustment,−1:00:00,-1.0000,4.3800,-4.38,yes,late start')
+  })
+})
+
+describe('custom pay periods (start day 26)', () => {
+  const p26: Schedule = { ...weekdays, periodStartDay: 26 }
+
+  it('keys a period by the month it ends in', () => {
+    expect(periodStart('2026-11', 26)).toBe('2026-10-26')
+    expect(periodEnd('2026-11', 26)).toBe('2026-11-25')
+    expect(periodOf('2026-11-25', 26)).toBe('2026-11')
+    expect(periodOf('2026-11-26', 26)).toBe('2026-12')
+    expect(periodOf('2026-12-26', 26)).toBe('2027-01')
+    expect(periodStart('2027-01', 26)).toBe('2026-12-26')
+    expect(formatPeriod('2026-11', 26)).toBe('November 2026 (Oct 26 – Nov 25)')
+  })
+
+  it('start day 1 is the calendar month, as before', () => {
+    expect(periodStart('2026-11')).toBe('2026-11-01')
+    expect(periodEnd('2026-11', 1)).toBe('2026-11-30')
+    expect(periodOf('2026-11-30', 1)).toBe('2026-11')
+    expect(formatPeriod('2026-11')).toBe('November 2026')
+    expect(clampStartDay(31)).toBe(28)
+  })
+
+  it('Oct 26 – Nov 25, 2026 has 23 working days (184 h) and 10 left after Nov 11', () => {
+    expect(monthWorkingDays('2026-11', p26)).toHaveLength(23)
+    expect(monthTargetSeconds('2026-11', p26)).toBe(184 * H)
+    expect(remainingWorkingDays('2026-11', '2026-11-11', p26)).toHaveLength(10)
+  })
+
+  it('counts entries and the tracker total by period, not calendar month', () => {
+    const s = summarizeMonth('2026-11', {
+      rates: rate438,
+      schedule: p26,
+      today: '2026-11-11',
+      entries: [entry('2026-10-25', 8 * H, 'backfill'), entry('2026-10-27', 8 * H, 'backfill'), entry('2026-11-26', 8 * H, 'backfill')],
+      periodTotals: [card('2026-11', '2026-10-28', '2026-11-11', '62:41:12', '274.57')],
+    })
+    expect(s.start).toBe('2026-10-26')
+    expect(s.end).toBe('2026-11-25')
+    expect(s.entries.map((v) => v.entry.date)).toEqual(['2026-10-27'])
+    expect(s.earnedCents).toBe(27457 + 3504)
+    expect(s.targetSeconds).toBe(184 * H)
+  })
+
+  it('"from the start of the period" means the 26th', () => {
+    const rates = applyRateChange(rate438, { id: 'r2', amount: 5, mode: 'month-start', date: '', month: '2026-12', startDay: 26 })
+    expect(rates.map((r) => r.effectiveFrom)).toEqual(['2026-01-01', '2026-11-26'])
+  })
+
+  it('names the range in the summary message', () => {
+    const s = summarizeMonth('2026-11', { ...november(), schedule: p26 })
+    const recon = reconcile({ month: '2026-11', expectedCents: s.earnedCents, workedSeconds: s.workedSeconds, rate4: s.rate4, fx: 123, payments: [] })
+    expect(buildMessage({ summary: s, recon, fx: 123, symbol: '৳' })).toContain('*Earnings summary — November 2026 (Oct 26 – Nov 25)*')
+  })
+})
+
+describe('earnings history', () => {
+  it('lists every period with data, newest first, with all-time totals', () => {
+    const payments = [
+      { id: 'p1', date: '2026-11-05', amountCents: 70000, currency: 'USD' as const, month: '2026-10' },
+      { id: 'p2', date: '2026-11-07', amountCents: 8200, currency: 'USD' as const, month: '2026-10' },
+    ]
+    const h = buildHistory({ ...october(), periodTotals: [...october().periodTotals, ...november().periodTotals], payments, fx: 123 })
+    expect(h.rows.map((r) => r.month)).toEqual(['2026-11', '2026-10'])
+    expect(h.rows[0]).toMatchObject({ current: true, earnedCents: 27457, paidCents: 0, status: 'none' })
+    expect(h.rows[1]).toMatchObject({ current: false, earnedCents: 76510, paidCents: 78200, gapCents: -1690, status: 'paid' })
+    expect(h.totals).toMatchObject({ earnedCents: 76510 + 27457, paidCents: 78200, gapCents: 76510 + 27457 - 78200 })
+
+    const csv = historyToCSV(h).split('\n')
+    expect(csv[1]).toBe('"October 2026",2026-10-01,2026-10-31,174:40:48,174.6800,765.10,782.00,-16.90,paid')
+    expect(csv[3]).toContain('"Total"')
+  })
+})
+
+describe('changing the period start day', () => {
+  it('flags a tracker total that a newer one in the same period hides', () => {
+    const cards = [card('2026-10', '2026-10-12', '2026-10-30', '118:40:48', '519.82'), card('2026-11', '2026-11-02', '2026-11-11', '62:41:12', '274.57')]
+    expect(uncountedCards(cards, 1)).toEqual([])
+    expect(uncountedCards(cards, 26).map((c) => c.endDate)).toEqual(['2026-10-30'])
   })
 })
