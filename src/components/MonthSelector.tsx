@@ -12,14 +12,14 @@ export function MonthSelector() {
   const picker = useRef<HTMLInputElement>(null)
 
   return (
-    <div className="flex items-center gap-1">
+    <div className="flex flex-wrap items-center gap-1">
       <Button variant="ghost" size="icon" aria-label="Previous month" onClick={() => shiftMonth(-1)}>
         <ChevronLeft className="size-5" />
       </Button>
       <div className="relative">
         <button
           type="button"
-          className="min-h-11 rounded-[12px] px-2 text-lg font-semibold tracking-tight hover:bg-surface-2"
+          className="min-h-11 whitespace-nowrap rounded-[12px] px-2 text-lg font-semibold tracking-tight hover:bg-surface-2"
           onClick={() => picker.current?.showPicker?.() ?? picker.current?.focus()}
           aria-label={`${formatMonth(month)}. Jump to month`}
         >
@@ -39,7 +39,7 @@ export function MonthSelector() {
         <ChevronRight className="size-5" />
       </Button>
       {month !== current && (
-        <Button variant="soft" size="sm" onClick={() => setMonth(current)} className="ml-1">
+        <Button variant="soft" size="sm" onClick={() => setMonth(current)} className="ml-1 whitespace-nowrap">
           This month
         </Button>
       )}

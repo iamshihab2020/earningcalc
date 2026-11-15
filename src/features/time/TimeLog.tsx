@@ -190,25 +190,36 @@ export function TimeLog() {
 }
 
 function EntryRow({ v, onEdit, onDelete }: { v: ValuedEntry; onEdit: () => void; onDelete: () => void }) {
+  const text = v.covered ? 'In tracker total, not counted again' : v.entry.note
+  const detail = (v.extra || text) && (
+    <>
+      {v.extra && (
+        <Chip tone="info" className="mr-2 px-2 py-0 text-xs">
+          Extra
+        </Chip>
+      )}
+      {text}
+    </>
+  )
   return (
     <li className="flex items-center gap-1">
       <button
         type="button"
         onClick={onEdit}
-        className={cn('flex min-h-12 min-w-0 flex-1 items-center gap-3 rounded-[12px] px-3 text-left hover:bg-surface-2', v.covered && 'opacity-70')}
+        className={cn(
+          'flex min-h-12 min-w-0 flex-1 flex-col justify-center gap-1 rounded-[12px] px-3 py-1.5 text-left hover:bg-surface-2',
+          v.covered && 'opacity-70',
+        )}
         aria-label={`Edit ${entryTypeLabel[v.entry.type]} entry, ${formatHours(v.entry.seconds)} hours on ${formatDay(v.entry.date)}`}
       >
-        <span className={cn('shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold', typeBadge[v.entry.type])}>{entryTypeLabel[v.entry.type]}</span>
-        <span className="min-w-0 flex-1 truncate text-sm text-muted">
-          {v.extra && (
-            <Chip tone="info" className="mr-2 px-2 py-0 text-xs">
-              Extra
-            </Chip>
-          )}
-          {v.covered ? 'In tracker total, not counted again' : v.entry.note}
+        <span className="flex w-full items-center gap-3">
+          <span className={cn('shrink-0 rounded-full px-2 py-0.5 text-xs font-semibold', typeBadge[v.entry.type])}>{entryTypeLabel[v.entry.type]}</span>
+          {/* Wide screens: detail inline. Phones: on its own line below, so it isn't cut to a few letters. */}
+          <span className="min-w-0 flex-1 truncate text-sm text-muted max-sm:invisible">{detail}</span>
+          <Duration seconds={v.entry.seconds} className="font-medium" />
+          <span className={cn('num w-20 text-right font-medium', v.covered && 'line-through decoration-muted')}>{formatUSD(v.cents)}</span>
         </span>
-        <Duration seconds={v.entry.seconds} className="font-medium" />
-        <span className={cn('num w-20 text-right font-medium', v.covered && 'line-through decoration-muted')}>{formatUSD(v.cents)}</span>
+        {detail && <span className="w-full truncate text-sm text-muted sm:hidden">{detail}</span>}
       </button>
       <Button variant="ghost" size="icon" aria-label="Delete entry" onClick={onDelete} className="text-muted hover:text-danger-text">
         <Trash2 className="size-4" />

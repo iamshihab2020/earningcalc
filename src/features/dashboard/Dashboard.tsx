@@ -172,7 +172,7 @@ function MonthDashboard({ month }: { month: string }) {
         <Stat
           label="Days left"
           value={s.remainingDays.length}
-          sub={isPast ? 'month ended' : isCurrent ? (settings.countTodayAsWorked ? 'workdays from tomorrow' : 'workdays incl. today') : 'workdays in month'}
+          sub={isPast ? 'month ended' : isCurrent ? (settings.countTodayAsWorked ? 'from tomorrow' : 'including today') : 'workdays in month'}
         />
         <Stat label="Projected total" value={formatUSD(sc.keepGoing.cents)} sub={`≈ ${f.local(sc.keepGoing.cents)}`} />
       </div>
