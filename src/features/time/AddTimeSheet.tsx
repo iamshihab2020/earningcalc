@@ -1,4 +1,4 @@
-import { useMemo, useState, type FormEvent, type ReactNode } from 'react'
+import { useMemo, useState, type ClipboardEvent, type FormEvent, type ReactNode } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { Tabs } from 'radix-ui'
 import { Trash2 } from 'lucide-react'
@@ -21,6 +21,7 @@ import {
   monthOf,
   parseCents,
   parseDuration,
+  parseTrackerSummary,
   rate4On,
   rateDifference,
   type EntryType,
@@ -101,18 +102,21 @@ function DurationInput({
   onChange,
   invalid,
   autoFocus,
+  onPaste,
 }: {
   id: string
   value: string
   onChange: (v: string) => void
   invalid?: boolean
   autoFocus?: boolean
+  onPaste?: (e: ClipboardEvent<HTMLInputElement>) => void
 }) {
   return (
     <Input
       id={id}
       value={value}
       onChange={(e) => onChange(e.target.value)}
+      onPaste={onPaste}
       onFocus={(e) => e.target.select()}
       placeholder="8:00:00 or 8.5"
       autoComplete="off"
@@ -366,6 +370,15 @@ function CardForm({ editing, onDone }: { editing?: PeriodTotal; onDone: () => vo
   const differs = derived && saved4 > 0 && rateDifference(derived.rate4, saved4) > 0.01
   const existing = periodTotals.find((p) => period.of(p.endDate) === cardMonth && p.id !== editing?.id)
 
+  /** Pasting the tracker's whole summary fills both boxes. */
+  const pasteSummary = (e: ClipboardEvent<HTMLInputElement>) => {
+    const parsed = parseTrackerSummary(e.clipboardData.getData('text'))
+    if (parsed.seconds === null || parsed.cents === null) return
+    e.preventDefault()
+    setTime(formatHMS(parsed.seconds))
+    setEarned((parsed.cents / 100).toFixed(2))
+  }
+
   const submit = (e: FormEvent) => {
     e.preventDefault()
     setTouched(true)
@@ -384,20 +397,17 @@ function CardForm({ editing, onDone }: { editing?: PeriodTotal; onDone: () => vo
       undoToast(existing || editing ? 'Tracker total replaced' : 'Tracker total saved', undoCard)
     }
     onDone()
-    if (differs && derived) {
-      openRateChange(derived.rate4 / 10_000)
-    }
   }
 
   return (
     <form onSubmit={submit} className="flex flex-col gap-4" noValidate>
       <p className="text-sm text-muted">
-        Copy the totals from your tracker's schedule card. Pasting a newer reading for the same {period.custom ? 'pay period' : 'month'}{' '}
-        replaces the old one.
+        Copy the totals from your tracker, or paste its whole summary into either box. A newer reading for the same{' '}
+        {period.custom ? 'pay period' : 'month'} replaces the old one.
       </p>
       <div className="grid grid-cols-2 gap-3">
         <Field label="Total time" htmlFor="card-time" error={touched && !seconds ? 'e.g. 62:41:12' : null}>
-          <DurationInput id="card-time" value={time} onChange={setTime} invalid={touched && !seconds} autoFocus />
+          <DurationInput id="card-time" value={time} onChange={setTime} invalid={touched && !seconds} autoFocus onPaste={pasteSummary} />
         </Field>
         <Field label="Total earned" htmlFor="card-earned" error={touched && cents === null ? 'e.g. 274.57' : null}>
           <AffixInput
@@ -406,6 +416,7 @@ function CardForm({ editing, onDone }: { editing?: PeriodTotal; onDone: () => vo
             inputMode="decimal"
             value={earned}
             onChange={(e) => setEarned(e.target.value)}
+            onPaste={pasteSummary}
             placeholder="0.00"
             className="text-lg font-semibold"
             aria-invalid={touched && cents === null}
@@ -452,9 +463,14 @@ function CardForm({ editing, onDone }: { editing?: PeriodTotal; onDone: () => vo
         </div>
       )}
       {differs && derived && (
-        <Notice tone="warning">
-          Your saved rate is {formatRate(saved4)}/h, but this reading works out to {formatRate(derived.rate4, derived.decimals)}/h (
-          {(rateDifference(derived.rate4, saved4) * 100).toFixed(1)}% different). After saving you can update your rate.
+        <Notice tone="info">
+          This works out to {formatRate(derived.rate4, derived.decimals)}/h on average; your rate is {formatRate(saved4)}/h. That's normal if your
+          tracker includes overtime or bonuses: the tracker's {formatUSD(cents!)} is what counts as earned. If your rate itself changed, update
+          it in{' '}
+          <button type="button" className="font-semibold underline" onClick={() => openRateChange(derived.rate4 / 10_000)}>
+            Rate &amp; schedule
+          </button>
+          .
         </Notice>
       )}
       {rates.length === 0 && derived && <Notice tone="info">Your hourly rate will be set to {formatRate(derived.rate4, derived.decimals)}/h from {formatShortDate(period.start(cardMonth))}.</Notice>}

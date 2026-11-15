@@ -66,6 +66,7 @@ export function CardMismatch({ card }: { card: CardValuation }) {
         Tracker said <strong className="num">{formatUSD(card.trackerCents)}</strong>, app calculated{' '}
         <strong className="num">{formatUSD(card.appCents)}</strong> from your rate history for{' '}
         {formatRange(card.card.startDate, card.card.endDate)}. Counting the {usingTracker ? "tracker's" : "app's"} figure.
+        {usingTracker && card.mismatchCents > 0 && ' The extra is usually overtime or a bonus your tracker includes.'}
       </p>
       <Button
         size="sm"

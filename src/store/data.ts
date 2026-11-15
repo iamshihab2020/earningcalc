@@ -203,6 +203,13 @@ export const useData = create<DataStore>()(
   ),
 )
 
+// Another tab saved: load its data, so this tab doesn't show (and later write back) stale numbers.
+if (typeof window !== 'undefined') {
+  window.addEventListener('storage', (e) => {
+    if (e.key === useData.persist.getOptions().name) void useData.persist.rehydrate()
+  })
+}
+
 export const loadSample = () => useData.getState().replaceAll(sampleData(newId))
 
 export const hasAnyData = (s: AppData) =>

@@ -29,6 +29,7 @@ import {
   parseBackup,
   parseCents,
   parseDuration,
+  parseTrackerSummary,
   rateChangeImpact,
   rateDifference,
   reconcile,
@@ -536,5 +537,20 @@ describe('changing the period start day', () => {
     const cards = [card('2026-10', '2026-10-12', '2026-10-30', '118:40:48', '519.82'), card('2026-11', '2026-11-02', '2026-11-11', '62:41:12', '274.57')]
     expect(uncountedCards(cards, 1)).toEqual([])
     expect(uncountedCards(cards, 26).map((c) => c.endDate)).toEqual(['2026-10-30'])
+  })
+})
+
+describe('pasting a tracker summary', () => {
+  it('reads total time and total earned from the copied block', () => {
+    const pasted = 'Total time\n126:13:47\nshow_chart\nAverage activity\n39%\ncredit_card\nTotal earned\n$552.89'
+    expect(parseTrackerSummary(pasted)).toEqual({ seconds: parseDuration('126:13:47'), cents: 55289 })
+    expect(parseTrackerSummary('Total time 1,234:00:00')).toEqual({ seconds: null, cents: null })
+    expect(parseTrackerSummary('Total earned $1,204.50')).toEqual({ seconds: null, cents: 120450 })
+  })
+
+  it('$552.89 for 126:13:47 averages $4.38/h; at $4.33/h the app values it at $546.57', () => {
+    const seconds = parseDuration('126:13:47')!
+    expect(deriveRate(seconds, 55289)!.rate4).toBe(43800)
+    expect(earnCents(seconds, 43300)).toBe(54657)
   })
 })

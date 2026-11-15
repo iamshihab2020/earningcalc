@@ -209,3 +209,42 @@ test('pay period 26th–25th, and the earnings history adds every period up', as
   await page.getByRole('button', { name: /October 2026 \(Sep 26 – Oct 25\)/ }).click()
   await expect(hero(page)).toContainText('$35.04')
 })
+
+test('rate $4.33 with overtime: paste the tracker summary, tracker total counts, other tabs follow', async ({ page, context }) => {
+  await page.clock.setFixedTime(new Date('2026-11-15T10:00:00'))
+  await page.goto('/')
+  const other = await context.newPage()
+  await other.clock.setFixedTime(new Date('2026-11-15T10:00:00'))
+  await other.goto('/#/history')
+
+  await goto(page, '/rates')
+  await page.getByLabel('Pay period starts on').selectOption('25')
+  await goto(page, '/')
+  await page.getByRole('button', { name: 'Set hourly rate' }).click()
+  await page.getByLabel('Hourly rate (USD)').fill('4.33')
+  await page.getByRole('button', { name: 'Save rate' }).click()
+
+  await addTimeButton(page).click()
+  await page.getByRole('tab', { name: 'Tracker total' }).click()
+  const sheet = page.getByRole('dialog')
+  await sheet.getByLabel('Total time').evaluate((el, text) => {
+    const data = new DataTransfer()
+    data.setData('text', text)
+    el.dispatchEvent(new ClipboardEvent('paste', { clipboardData: data, bubbles: true, cancelable: true }))
+  }, 'Total time\n126:13:47\nshow_chart\nAverage activity\n39%\ncredit_card\nTotal earned\n$552.89')
+  await expect(sheet.getByLabel('Total time')).toHaveValue('126:13:47')
+  await expect(sheet.getByLabel('Total earned')).toHaveValue('552.89')
+  await expect(sheet.getByLabel('First day tracked')).toHaveValue('2026-10-25')
+  await expect(sheet).toContainText('normal if your tracker includes overtime')
+  await sheet.getByRole('button', { name: 'Save tracker total' }).click()
+
+  // No rate prompt; the tracker's figure counts, and the $4.33 rate stays.
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+  await expect(hero(page)).toContainText('$552.89')
+  await expect(page.locator('main')).toContainText('$4.33')
+  await expect(page.locator('main')).toContainText('usually overtime')
+
+  // The tab that was already open picks up the change.
+  await expect(other.locator('main')).toContainText('$552.89')
+  await expect(other.locator('main')).toContainText('Oct 25 – Nov 24')
+})

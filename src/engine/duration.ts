@@ -1,3 +1,4 @@
+import { parseScaled } from './money'
 /**
  * Durations are integer seconds. Input accepts `118:40:48`, `118:40`,
  * `118.68` (decimal hours), and friendly forms like `8h 30m`.
@@ -62,4 +63,15 @@ export function formatDuration(seconds: number, format: 'hms' | 'decimal'): stri
 export function formatHoursShort(seconds: number, decimals = 1): string {
   const value = Number(formatHours(seconds, decimals))
   return `${Number.isInteger(value) ? value.toFixed(0) : value} h`
+}
+
+/**
+ * Pull "Total time" and "Total earned" out of a summary copied from a tracker,
+ * e.g. "Total time 126:13:47 … Total earned $552.89". Either may be missing.
+ */
+export function parseTrackerSummary(text: string): { seconds: number | null; cents: number | null } {
+  const time = /total\s*time\D{0,40}?(\d+:\d{2}(?::\d{2})?)/i.exec(text)
+  const earned = /total\s*earned[^\d]{0,40}?(\d[\d,]*(?:\.\d{1,2})?)/i.exec(text)
+  const cents = earned ? parseScaled(earned[1], 2) : null
+  return { seconds: time ? parseDuration(time[1]) : null, cents }
 }
